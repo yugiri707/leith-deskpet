@@ -170,11 +170,23 @@ html, body {
   var DOUBLE_TAP_WORDS = ['❤️','喜欢你~','嘿嘿嘿','心跳加速中','你怎么这么可爱','被你戳到心了'];
   var LONG_PRESS_WORDS = ['……你要摸多久','不许摸头！','舒服……才没有！','手放哪呢','哼，就这次','别松手……开玩笑的'];
 
-  /* ── tap reactions: things that can happen when you poke idle crab ── */
-  var TAP_REACTIONS = ['happy','shy','heart','coffee','music','reactLeft','reactRight'];
+  /* ── tap reactions with per-reaction display durations ── */
+  var TAP_REACTIONS = [
+    { key:'happy',      dur:3000 },
+    { key:'shy',        dur:3500 },
+    { key:'heart',      dur:3000 },
+    { key:'coffee',     dur:5000 },
+    { key:'music',      dur:6000 },
+    { key:'reactLeft',  dur:3000 },
+    { key:'reactRight', dur:3000 }
+  ];
 
   /* ── double-tap reactions ── */
-  var DOUBLE_REACTIONS = ['reactDouble','reactDoubleJump'];
+  var DOUBLE_REACTIONS = [
+    { key:'heart',           dur:3000 },
+    { key:'reactDouble',     dur:3500 },
+    { key:'reactDoubleJump', dur:3500 }
+  ];
 
   /* ── state ── */
   var current = 'idle';
@@ -254,11 +266,11 @@ html, body {
     /* occasional idle variation every 15-30s */
     idleVariTimer = setTimeout(function(){
       if (locked || asleep) return;
-      /* each variation has its own duration from theme.json */
+      /* each variation has its own duration from SVG scan */
       var variations = [
-        { key:'look',    dur:6500 },
+        { key:'look',    dur:10000 },
         { key:'reading', dur:14000 },
-        { key:'bubble',  dur:13500 }
+        { key:'bubble',  dur:9000 }
       ];
       var v = pick(variations);
       setImg(v.key);
@@ -322,26 +334,26 @@ html, body {
       if (locked) return;
       if (asleep) { wakeUp(); return; }
       flashPoke();
-      var reaction = pick(TAP_REACTIONS);
-      setImg(reaction);
-      var pool = WORDS[reaction];
+      var r = pick(TAP_REACTIONS);
+      setImg(r.key);
+      var pool = WORDS[r.key];
       if (pool) showBubble(pick(pool));
       clearTimeout(idleVariTimer);
       clearTimeout(sleepChainTimer);
-      revertToIdle(3000);
+      revertToIdle(r.dur);
     },
 
     onDoubleTap: function() {
       if (locked) return;
       if (asleep) { wakeUp(); return; }
       flashPoke();
-      var r = pick(['heart','reactDouble','reactDoubleJump']);
-      setImg(r);
-      var pool = WORDS[r];
+      var r = pick(DOUBLE_REACTIONS);
+      setImg(r.key);
+      var pool = WORDS[r.key];
       if (pool) showBubble(pick(pool));
       clearTimeout(idleVariTimer);
       clearTimeout(sleepChainTimer);
-      revertToIdle(3500);
+      revertToIdle(r.dur);
     },
 
     onLongPress: function() {
@@ -363,12 +375,12 @@ html, body {
       level = Math.min(level, 3);
       if (level === 1) {
         setImg('reactAnnoyed');
-        showBubble(pick(WORDS.dizzy));
-        revertToIdle(6000);
+        showBubble(pick(WORDS.reactAnnoyed));
+        lockFor(6, function(){ goIdle(); });
       } else if (level === 2) {
-        setImg('error');
-        showBubble(pick(WORDS.error));
-        revertToIdle(4000);
+        setImg('dizzy');
+        showBubble(pick(WORDS.dizzy));
+        lockFor(6, function(){ goIdle(); });
       } else {
         setImg('outlaw');
         showBubble(pick(WORDS.outlaw), 15000);
