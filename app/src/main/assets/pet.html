@@ -26,43 +26,6 @@ html, body {
   display:block;
 }
 
-#bubble {
-  position:absolute;
-  bottom:155px;
-  left:50%;
-  transform:translateX(-50%);
-  background:rgba(0,0,0,0.72);
-  backdrop-filter:blur(6px);
-  -webkit-backdrop-filter:blur(6px);
-  color:#fff;
-  font-size:13px;
-  font-family:'Segoe UI',system-ui,sans-serif;
-  padding:6px 14px;
-  border-radius:14px;
-  white-space:nowrap;
-  max-width:260px;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  opacity:0;
-  transition:opacity 0.3s;
-  pointer-events:none;
-  z-index:10;
-  text-align:center;
-}
-#bubble.show { opacity:1; }
-
-#bubble::after {
-  content:'';
-  position:absolute;
-  bottom:-6px;
-  left:50%;
-  transform:translateX(-50%);
-  width:0; height:0;
-  border-left:6px solid transparent;
-  border-right:6px solid transparent;
-  border-top:6px solid rgba(0,0,0,0.72);
-}
-
 .poke-flash {
   animation: poke-bright 0.2s ease-out;
 }
@@ -74,7 +37,6 @@ html, body {
 </head>
 <body>
 
-<div id="bubble"></div>
 <div id="pet-container">
   <img id="pet-svg" src="clawd-idle-living.svg" alt="Clawd">
 </div>
@@ -108,46 +70,12 @@ html, body {
   var TAP_REACTIONS = ['happy','shy','wake','heart'];
   var COMBO_REACTIONS = ['dizzy','error','outlaw'];
 
-  var TAP_WORDS = [
-    '干嘛戳我！','哼。','嗯？','在呢~',
-    '再戳就生气了…','痒！','你好呀~',
-    '别闹……','我在忙！','嘿嘿',
-    '想我了？','戳戳戳，烦死了','看什么看',
-    '哼，不理你了','……你手痒？'
-  ];
-
-  var DOUBLE_TAP_WORDS = [
-    '❤️','喜欢你~','嘿嘿嘿','心跳加速中',
-    '你怎么这么可爱','被你戳到心了'
-  ];
-
-  var LONG_PRESS_WORDS = [
-    '……你要摸多久','不许摸头！','舒服……才没有！',
-    '手放哪呢','哼，就这次','别松手……开玩笑的'
-  ];
-
-  var COMBO_WORDS = [
-    ['戳戳戳够了没！','好了好了知道了！','消停会儿行不！'],
-    ['救命别戳了！','要炸了要炸了！','你是连击狂魔吗！'],
-    ['☠️ 我要死了……','晕了晕了真的晕了','你赢了……倒下了']
-  ];
-
-  var IDLE_WORDS = [
-    '在吗？','……','好无聊','你在干嘛呀',
-    '要不要来聊天','我看看你在忙什么','哈欠~',
-    '今天过得怎么样','有点想打瞌睡了','嗯哼~'
-  ];
-
-  var SLEEP_WORDS = ['zzZ','呼……','做梦中……'];
-
   var currentState = 'idle';
   var idleTimer = null;
   var sleepTimer = null;
-  var bubbleTimer = null;
   var revertTimer = null;
 
   var petImg = document.getElementById('pet-svg');
-  var bubble = document.getElementById('bubble');
   var container = document.getElementById('pet-container');
 
   function pick(arr) {
@@ -158,16 +86,6 @@ html, body {
     currentState = stateKey;
     var file = STATES[stateKey];
     if (file) petImg.src = file + '.svg';
-  }
-
-  function showBubble(text, duration) {
-    duration = duration || 2500;
-    bubble.textContent = text;
-    bubble.classList.add('show');
-    clearTimeout(bubbleTimer);
-    bubbleTimer = setTimeout(function(){
-      bubble.classList.remove('show');
-    }, duration);
   }
 
   function flashPoke() {
@@ -192,16 +110,12 @@ html, body {
     idleTimer = setTimeout(function(){
       var s = pick(IDLE_STATES);
       setSvg(s);
-      if (Math.random() < 0.4) {
-        showBubble(pick(IDLE_WORDS));
-      }
       resetIdleTimer();
     }, 12000 + Math.random() * 13000);
 
     sleepTimer = setTimeout(function(){
       clearTimeout(idleTimer);
       setSvg('sleeping');
-      showBubble(pick(SLEEP_WORDS), 4000);
     }, 120000 + Math.random() * 60000);
   }
 
@@ -211,7 +125,6 @@ html, body {
     clearTimeout(revertTimer);
     if (currentState === 'sleeping' || currentState === 'collapse') {
       setSvg('wake');
-      showBubble('嗯……醒了醒了');
       revertToIdle(2000);
     }
   }
@@ -224,7 +137,6 @@ html, body {
       }
       flashPoke();
       setSvg(pick(TAP_REACTIONS));
-      showBubble(pick(TAP_WORDS));
       revertToIdle(3000);
     },
 
@@ -235,7 +147,6 @@ html, body {
       }
       flashPoke();
       setSvg('heart');
-      showBubble(pick(DOUBLE_TAP_WORDS));
       revertToIdle(3000);
     },
 
@@ -245,7 +156,6 @@ html, body {
         return;
       }
       setSvg('shy');
-      showBubble(pick(LONG_PRESS_WORDS));
       revertToIdle(4000);
     },
 
@@ -258,7 +168,6 @@ html, body {
       level = Math.min(level, 3);
       var idx = level - 1;
       setSvg(COMBO_REACTIONS[idx] || 'dizzy');
-      showBubble(pick(COMBO_WORDS[idx] || COMBO_WORDS[0]));
       var delay = level >= 3 ? 5000 : 3500;
       revertToIdle(delay);
     },
@@ -273,7 +182,6 @@ html, body {
       } else {
         setSvg('thinking');
       }
-      showBubble(text, 4000);
       revertToIdle(5000);
     },
 
