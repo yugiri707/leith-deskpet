@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+    width: 100%; height: 100%;
+    background: transparent;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.pet-container {
+    position: absolute;
+    width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+/* Speech bubble */
+.bubble {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 16px;
+    padding: 8px 14px;
+    font-size: 13px;
+    color: #333;
+    max-width: 160px;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    word-break: break-word;
+}
+.bubble.show { opacity: 1; }
+.bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid rgba(255,255,255,0.95);
+}
+
+/* Bubble color variants */
+.bubble.love { background: rgba(255, 200, 221, 0.95); color: #8B0040; }
+.bubble.love::after { border-top-color: rgba(255, 200, 221, 0.95); }
+.bubble.whisper { background: rgba(200, 200, 210, 0.9); color: #555; font-size: 11px; }
+.bubble.whisper::after { border-top-color: rgba(200, 200, 210, 0.9); }
+.bubble.shout { background: rgba(255, 100, 100, 0.95); color: #fff; font-weight: bold; }
+.bubble.shout::after { border-top-color: rgba(255, 100, 100, 0.95); }
+
+/* The crow body */
+.crow {
+    width: 120px;
+    height: 120px;
+    position: relative;
+    margin-bottom: 10px;
+}
+
+/* Main body - round */
+.crow-body {
+    width: 80px;
+    height: 80px;
+    background: #2D2D2D;
+    border-radius: 50%;
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    transition: transform 0.2s ease;
+}
+
+/* Eyes */
+.eyes {
+    position: absolute;
+    top: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 16px;
+}
+.eye {
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    border-radius: 50%;
+    position: relative;
+    overflow: hidden;
+}
+.eye::after {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: #FF6B6B;
+    border-radius: 50%;
+    top: 3px;
+    left: 3px;
+    transition: all 0.15s ease;
+}
+
+/* X eyes for angry/combo */
+.eye.x-eye {
+    background: transparent;
+}
+.eye.x-eye::before {
+    content: '×';
+    position: absolute;
+    font-size: 18px;
+    font-weight: bold;
+    color: #FF6B6B;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+.eye.x-eye::after { display: none; }
+
+/* Heart eyes */
+.eye.heart-eye {
+    background: transparent;
+}
+.eye.heart-eye::before {
+    content: '♥';
+    position: absolute;
+    font-size: 14px;
+    color: #FF6B9D;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+.eye.heart-eye::after { display: none; }
+
+/* Closed eyes (sleep) */
+.eye.closed {
+    height: 3px;
+    border-radius: 3px;
+    top: 8px;
+    background: #fff;
+}
+.eye.closed::after { display: none; }
+
+/* Beak */
+.beak {
+    position: absolute;
+    top: 38px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 10px solid #FFB347;
+}
+
+/* Blush marks */
+.blush {
+    position: absolute;
+    top: 36px;
+    width: 12px;
+    height: 6px;
+    background: rgba(255, 107, 157, 0.6);
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+.blush.left { left: 8px; }
+.blush.right { right: 8px; }
+.blush.show { opacity: 1; }
+
+/* Tiny wings */
+.wing {
+    position: absolute;
+    bottom: 20px;
+    width: 20px;
+    height: 30px;
+    background: #3D3D3D;
+    border-radius: 50%;
+    transition: transform 0.2s ease;
+}
+.wing.left { left: -5px; transform: rotate(-10deg); }
+.wing.right { right: -5px; transform: rotate(10deg); }
+
+/* Animations */
+@keyframes idle-bob {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(-4px); }
+}
+@keyframes shake {
+    0%, 100% { transform: translateX(-50%) rotate(0deg); }
+    25% { transform: translateX(-50%) rotate(-8deg); }
+    75% { transform: translateX(-50%) rotate(8deg); }
+}
+@keyframes jump {
+    0% { transform: translateX(-50%) translateY(0); }
+    40% { transform: translateX(-50%) translateY(-25px); }
+    100% { transform: translateX(-50%) translateY(0); }
+}
+@keyframes flap {
+    0%, 100% { transform: rotate(-10deg); }
+    50% { transform: rotate(-40deg); }
+}
+@keyframes wing-flap-right {
+    0%, 100% { transform: rotate(10deg); }
+    50% { transform: rotate(40deg); }
+}
+@keyframes squish {
+    0% { transform: translateX(-50%) scaleX(1) scaleY(1); }
+    30% { transform: translateX(-50%) scaleX(1.2) scaleY(0.8); }
+    60% { transform: translateX(-50%) scaleX(0.9) scaleY(1.1); }
+    100% { transform: translateX(-50%) scaleX(1) scaleY(1); }
+}
+@keyframes zzz-float {
+    0% { opacity: 1; transform: translate(0, 0) scale(1); }
+    100% { opacity: 0; transform: translate(20px, -30px) scale(1.3); }
+}
+
+.crow-body.idle { animation: idle-bob 3s ease-in-out infinite; }
+.crow-body.shake { animation: shake 0.3s ease-in-out; }
+.crow-body.jump { animation: jump 0.4s ease-out; }
+.crow-body.squish { animation: squish 0.4s ease-out; }
+
+.wing.left.flap { animation: flap 0.3s ease-in-out 3; }
+.wing.right.flap { animation: wing-flap-right 0.3s ease-in-out 3; }
+
+/* Sleep zzz */
+.zzz {
+    position: absolute;
+    top: 5px;
+    right: 10px;
+    font-size: 16px;
+    color: #aaa;
+    opacity: 0;
+}
+.zzz.show { animation: zzz-float 2s ease-out infinite; }
+</style>
+</head>
+<body>
+<div class="pet-container">
+    <div class="bubble" id="bubble"></div>
+    <div class="crow" id="crow">
+        <div class="crow-body idle" id="body">
+            <div class="eyes" id="eyes">
+                <div class="eye" id="eyeL"></div>
+                <div class="eye" id="eyeR"></div>
+            </div>
+            <div class="beak"></div>
+            <div class="blush left" id="blushL"></div>
+            <div class="blush right" id="blushR"></div>
+            <div class="wing left" id="wingL"></div>
+            <div class="wing right" id="wingR"></div>
+        </div>
+        <div class="zzz" id="zzz">z</div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var body = document.getElementById('body');
+    var bubble = document.getElementById('bubble');
+    var eyeL = document.getElementById('eyeL');
+    var eyeR = document.getElementById('eyeR');
+    var blushL = document.getElementById('blushL');
+    var blushR = document.getElementById('blushR');
+    var wingL = document.getElementById('wingL');
+    var wingR = document.getElementById('wingR');
+    var zzz = document.getElementById('zzz');
+
+    var bubbleTimer = null;
+    var state = 'idle';
+    var idleTime = 0;
+    var idleTimer = null;
+
+    // --- Bubble ---
+    function showBubble(text, style, duration) {
+        bubble.textContent = text;
+        bubble.className = 'bubble show' + (style ? ' ' + style : '');
+        clearTimeout(bubbleTimer);
+        bubbleTimer = setTimeout(function() {
+            bubble.className = 'bubble';
+        }, duration || 3000);
+    }
+
+    // --- Eye states ---
+    function normalEyes() {
+        eyeL.className = 'eye';
+        eyeR.className = 'eye';
+    }
+    function xEyes() {
+        eyeL.className = 'eye x-eye';
+        eyeR.className = 'eye x-eye';
+    }
+    function heartEyes() {
+        eyeL.className = 'eye heart-eye';
+        eyeR.className = 'eye heart-eye';
+    }
+    function closedEyes() {
+        eyeL.className = 'eye closed';
+        eyeR.className = 'eye closed';
+    }
+
+    // --- Blush ---
+    function showBlush() {
+        blushL.className = 'blush left show';
+        blushR.className = 'blush right show';
+    }
+    function hideBlush() {
+        blushL.className = 'blush left';
+        blushR.className = 'blush right';
+    }
+
+    // --- Wings ---
+    function flapWings() {
+        wingL.className = 'wing left flap';
+        wingR.className = 'wing right flap';
+        setTimeout(function() {
+            wingL.className = 'wing left';
+            wingR.className = 'wing right';
+        }, 1000);
+    }
+
+    // --- Body animation ---
+    function playAnim(name, duration) {
+        body.className = 'crow-body ' + name;
+        setTimeout(function() {
+            body.className = 'crow-body idle';
+        }, duration || 400);
+    }
+
+    // --- Sleep ---
+    function enterSleep() {
+        state = 'sleep';
+        closedEyes();
+        body.className = 'crow-body';
+        zzz.className = 'zzz show';
+    }
+    function exitSleep() {
+        state = 'idle';
+        normalEyes();
+        body.className = 'crow-body idle';
+        zzz.className = 'zzz';
+    }
+
+    // --- Idle timer ---
+    function resetIdleTimer() {
+        idleTime = 0;
+        if (state === 'sleep') { exitSleep(); }
+    }
+
+    setInterval(function() {
+        if (state === 'sleep') return;
+        idleTime++;
+        if (idleTime === 60) { // 1 min: peek
+            showBubble('...在吗？', 'whisper', 3000);
+        } else if (idleTime === 180) { // 3 min: bored
+            showBubble('好无聊...', '', 3000);
+            playAnim('squish', 400);
+        } else if (idleTime === 600) { // 10 min: sleepy
+            showBubble('要睡了...', 'whisper', 4000);
+        } else if (idleTime >= 900) { // 15 min: sleep
+            enterSleep();
+        }
+    }, 1000);
+
+    // --- Random idle actions ---
+    setInterval(function() {
+        if (state !== 'idle') return;
+        var r = Math.random();
+        if (r < 0.15) {
+            // random blink
+            closedEyes();
+            setTimeout(normalEyes, 200);
+        } else if (r < 0.2) {
+            flapWings();
+        }
+    }, 4000);
+
+    // --- Tap responses ---
+    var tapLines = [
+        '嗯？', '干嘛戓我', '在呢', '你手好暖',
+        '别戳了啦', '...', '看什么呢', '哼'
+    ];
+    var doubleTapLines = [
+        '！！', '吓我一跳', '做什么！'
+    ];
+    var longPressLines = [
+        '...你在摸我？', '手放哪呢', '唔...'
+    ];
+    var comboLines = [
+        ['别戳了！', '烦！', '够了！'],
+        ['你是不是闲的！', '再戳翅膀拍你', '(╯°□°）╯'],
+        ['......我记住了', '哼，生气了', '这次真生气了']
+    ];
+
+    function randomFrom(arr) {
+        return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    // --- Public API ---
+    window.petEngine = {
+        onTap: function() {
+            resetIdleTimer();
+            playAnim('squish', 400);
+            showBubble(randomFrom(tapLines));
+            // occasional blush
+            if (Math.random() < 0.3) {
+                showBlush();
+                setTimeout(hideBlush, 2000);
+            }
+        },
+        onDoubleTap: function() {
+            resetIdleTimer();
+            playAnim('jump', 400);
+            flapWings();
+            showBubble(randomFrom(doubleTapLines), 'shout');
+        },
+        onLongPress: function() {
+            resetIdleTimer();
+            heartEyes();
+            showBlush();
+            showBubble(randomFrom(longPressLines), 'love');
+            setTimeout(function() {
+                normalEyes();
+                hideBlush();
+            }, 3000);
+        },
+        onComboTap: function(level) {
+            resetIdleTimer();
+            xEyes();
+            playAnim('shake', 300);
+            var lines = comboLines[Math.min(level - 1, 2)];
+            showBubble(randomFrom(lines), 'shout', 3000);
+            setTimeout(function() {
+                normalEyes();
+            }, 3000);
+        },
+
+        // AI push interface
+        say: function(text, style) {
+            resetIdleTimer();
+            showBubble(text, style || '', 5000);
+        },
+        setMood: function(mood) {
+            resetIdleTimer();
+            switch(mood) {
+                case 'happy':
+                    heartEyes();
+                    showBlush();
+                    flapWings();
+                    setTimeout(function() { normalEyes(); hideBlush(); }, 3000);
+                    break;
+                case 'angry':
+                    xEyes();
+                    playAnim('shake', 300);
+                    setTimeout(normalEyes, 2000);
+                    break;
+                case 'shy':
+                    showBlush();
+                    closedEyes();
+                    setTimeout(function() { normalEyes(); hideBlush(); }, 3000);
+                    break;
+                case 'sleep':
+                    enterSleep();
+                    break;
+                case 'normal':
+                    exitSleep();
+                    normalEyes();
+                    hideBlush();
+                    break;
+            }
+        }
+    };
+})();
+</script>
+</body>
+</html>
