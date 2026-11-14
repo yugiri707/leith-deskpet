@@ -159,7 +159,12 @@ html, body {
     error:  ['要坏掉了！','救命','系统过载中','ERROR!!','哔——'],
     outlaw: ['哼，干杯','今晚不醉不归','……再来一瓶','别管我','世界真美好啊……嗝'],
     coffee: ['喝口水~','休息一下','☕','来一杯？'],
-    music:  ['♪♪♪','在听歌~','别打扰，有vibe','哼哼~']
+    music:  ['♪♪♪','在听歌~','别打扰，有vibe','哼哼~'],
+    reactLeft:  ['嗯？','看什么看','←那边','干嘛'],
+    reactRight: ['→','看右边','嗯哼','那边有什么'],
+    reactAnnoyed: ['烦死了','别戳了！','够了啊','再戳打你哦','哼！'],
+    reactDouble: ['！！','哇','干嘛连戳！','你很会啊'],
+    reactDoubleJump: ['跳！','蹦！','吓死了！','弹起来了']
   };
 
   var DOUBLE_TAP_WORDS = ['❤️','喜欢你~','嘿嘿嘿','心跳加速中','你怎么这么可爱','被你戳到心了'];
@@ -249,17 +254,22 @@ html, body {
     /* occasional idle variation every 15-30s */
     idleVariTimer = setTimeout(function(){
       if (locked || asleep) return;
-      var variations = ['look','reading','bubble'];
+      /* each variation has its own duration from theme.json */
+      var variations = [
+        { key:'look',    dur:6500 },
+        { key:'reading', dur:14000 },
+        { key:'bubble',  dur:13500 }
+      ];
       var v = pick(variations);
-      setImg(v);
-      /* stay on variation 5-10s then back to idle */
+      setImg(v.key);
+      /* stay on variation for its full duration then back to idle */
       revertTimer = setTimeout(function(){
         if (!locked && !asleep) {
           setImg('idle');
           current = 'idle';
         }
         startIdleLoop();
-      }, 5000 + Math.random() * 5000);
+      }, v.dur);
     }, 15000 + Math.random() * 15000);
 
     /* sleep chain: after 2-3 min of no interaction → yawn → collapse → sleeping */
@@ -325,9 +335,10 @@ html, body {
       if (locked) return;
       if (asleep) { wakeUp(); return; }
       flashPoke();
-      var r = pick(DOUBLE_REACTIONS);
+      var r = pick(['heart','reactDouble','reactDoubleJump']);
       setImg(r);
-      showBubble(pick(DOUBLE_TAP_WORDS));
+      var pool = WORDS[r];
+      if (pool) showBubble(pick(pool));
       clearTimeout(idleVariTimer);
       clearTimeout(sleepChainTimer);
       revertToIdle(3500);
