@@ -258,15 +258,11 @@ html, body {
     revertTimer = setTimeout(goIdle, delay || 3000);
   }
 
-  /* ── idle loop: mostly idle-living, occasionally look/reading ── */
-  function startIdleLoop() {
+  /* ── schedule next idle variation (does NOT reset sleep timer) ── */
+  function scheduleVariation() {
     clearTimeout(idleVariTimer);
-    clearTimeout(sleepChainTimer);
-
-    /* occasional idle variation every 15-30s */
     idleVariTimer = setTimeout(function(){
       if (locked || asleep) return;
-      /* each variation has its own duration from SVG scan */
       var variations = [
         { key:'look',    dur:10000 },
         { key:'reading', dur:14000 },
@@ -280,9 +276,19 @@ html, body {
           setImg('idle');
           current = 'idle';
         }
-        startIdleLoop();
+        /* only restart variation timer, sleep timer keeps counting */
+        scheduleVariation();
       }, v.dur);
     }, 15000 + Math.random() * 15000);
+  }
+
+  /* ── full idle reset: restart both variation AND sleep timer ── */
+  /* call this only after real user interaction or waking up */
+  function startIdleLoop() {
+    clearTimeout(idleVariTimer);
+    clearTimeout(sleepChainTimer);
+
+    scheduleVariation();
 
     /* sleep chain: after 2-3 min of no interaction → yawn → collapse → sleeping */
     sleepChainTimer = setTimeout(function(){
