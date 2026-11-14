@@ -26,6 +26,43 @@ html, body {
   display:block;
 }
 
+#bubble {
+  position:absolute;
+  bottom:165px;
+  left:50%;
+  transform:translateX(-50%);
+  background:rgba(0,0,0,0.75);
+  backdrop-filter:blur(6px);
+  -webkit-backdrop-filter:blur(6px);
+  color:#fff;
+  font-size:13px;
+  font-family:'Segoe UI',system-ui,sans-serif;
+  padding:5px 12px;
+  border-radius:12px;
+  white-space:nowrap;
+  max-width:240px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  opacity:0;
+  transition:opacity 0.3s;
+  pointer-events:none;
+  z-index:10;
+  text-align:center;
+}
+#bubble.show { opacity:1; }
+
+#bubble::after {
+  content:'';
+  position:absolute;
+  bottom:-5px;
+  left:50%;
+  transform:translateX(-50%);
+  width:0; height:0;
+  border-left:5px solid transparent;
+  border-right:5px solid transparent;
+  border-top:5px solid rgba(0,0,0,0.75);
+}
+
 .poke-flash {
   animation: poke-bright 0.2s ease-out;
 }
@@ -37,45 +74,69 @@ html, body {
 </head>
 <body>
 
+<div id="bubble"></div>
 <div id="pet-container">
   <img id="pet-svg" src="clawd-idle-living.svg" alt="Clawd">
 </div>
 
 <script>
 (function(){
+
+  /* ── state config ──
+     minTime: minimum seconds before this animation can be interrupted
+     oneshot: if true, lock input until minTime expires
+  */
   var STATES = {
-    idle:     'clawd-idle-living',
-    look:     'clawd-idle-look',
-    yawn:     'clawd-idle-yawn',
-    reading:  'clawd-idle-reading',
-    happy:    'clawd-happy',
-    heart:    'clawd-heart-eyes',
-    shy:      'clawd-aegyo-shy',
-    dizzy:    'clawd-dizzy',
-    error:    'clawd-error',
-    wake:     'clawd-wake',
-    thinking: 'clawd-working-thinking',
-    typing:   'clawd-working-typing',
-    building: 'clawd-working-building',
-    juggling: 'clawd-working-juggling',
-    wizard:   'clawd-working-wizard',
-    outlaw:   'clawd-outlaw-bender',
-    sleeping: 'clawd-sleeping',
-    collapse: 'clawd-collapse-sleep',
-    coffee:   'clawd-coffee-hand',
-    music:    'clawd-headphones-groove'
+    idle:     { file:'clawd-idle-living',        minTime:0,  oneshot:false },
+    look:     { file:'clawd-idle-look',           minTime:0,  oneshot:false },
+    yawn:     { file:'clawd-idle-yawn',           minTime:3.8, oneshot:true },
+    reading:  { file:'clawd-idle-reading',        minTime:0,  oneshot:false },
+    happy:    { file:'clawd-happy',               minTime:0,  oneshot:false },
+    heart:    { file:'clawd-heart-eyes',          minTime:0,  oneshot:false },
+    shy:      { file:'clawd-aegyo-shy',           minTime:0,  oneshot:false },
+    dizzy:    { file:'clawd-dizzy',               minTime:0,  oneshot:false },
+    error:    { file:'clawd-error',               minTime:0,  oneshot:false },
+    wake:     { file:'clawd-wake',                minTime:1.5, oneshot:true },
+    thinking: { file:'clawd-working-thinking',    minTime:0,  oneshot:false },
+    typing:   { file:'clawd-working-typing',      minTime:0,  oneshot:false },
+    building: { file:'clawd-working-building',    minTime:0,  oneshot:false },
+    juggling: { file:'clawd-working-juggling',    minTime:0,  oneshot:false },
+    wizard:   { file:'clawd-working-wizard',      minTime:0,  oneshot:false },
+    outlaw:   { file:'clawd-outlaw-bender',       minTime:15, oneshot:true },
+    sleeping: { file:'clawd-sleeping',            minTime:0,  oneshot:false },
+    collapse: { file:'clawd-collapse-sleep',      minTime:6,  oneshot:true },
+    coffee:   { file:'clawd-coffee-hand',         minTime:0,  oneshot:false },
+    music:    { file:'clawd-headphones-groove',   minTime:0,  oneshot:false }
   };
+
+  /* ── expression-matched word pools ── */
+  var WORDS = {
+    happy:  ['嘿嘿','你好呀~','嗯哼~','心情不错~','哼哼♪'],
+    heart:  ['喜欢你~','❤️','心跳加速中','被你戳到心了','……又心动了'],
+    shy:    ['别看我……','哼，才没有','你干嘛啦','脸好烫','不许说出去'],
+    wake:   ['干嘛戳我！','吓我一跳','嗯？','……困','谁啊'],
+    dizzy:  ['够了够了！','晕了……','头好晕','别戳了别戳了！','消停会儿行不！'],
+    error:  ['要坏掉了！','救命','系统过载中','ERROR!!','哔——'],
+    outlaw: ['哼，干杯','今晚不醉不归','……再来一瓶','别管我','世界真美好啊……嗝']
+  };
+
+  var DOUBLE_TAP_WORDS = ['❤️','喜欢你~','嘿嘿嘿','心跳加速中','你怎么这么可爱','被你戳到心了'];
+
+  var LONG_PRESS_WORDS = ['……你要摸多久','不许摸头！','舒服……才没有！','手放哪呢','哼，就这次','别松手……开玩笑的'];
 
   var IDLE_STATES = ['idle','look','yawn','reading','coffee','music'];
   var TAP_REACTIONS = ['happy','shy','wake','heart'];
-  var COMBO_REACTIONS = ['dizzy','error','outlaw'];
 
   var currentState = 'idle';
+  var locked = false;
+  var lockTimer = null;
   var idleTimer = null;
   var sleepTimer = null;
+  var bubbleTimer = null;
   var revertTimer = null;
 
   var petImg = document.getElementById('pet-svg');
+  var bubble = document.getElementById('bubble');
   var container = document.getElementById('pet-container');
 
   function pick(arr) {
@@ -83,9 +144,31 @@ html, body {
   }
 
   function setSvg(stateKey) {
+    var st = STATES[stateKey];
+    if (!st) return;
     currentState = stateKey;
-    var file = STATES[stateKey];
-    if (file) petImg.src = file + '.svg';
+    petImg.src = st.file + '.svg';
+
+    /* lock if oneshot */
+    clearTimeout(lockTimer);
+    if (st.oneshot && st.minTime > 0) {
+      locked = true;
+      lockTimer = setTimeout(function(){
+        locked = false;
+      }, st.minTime * 1000);
+    } else {
+      locked = false;
+    }
+  }
+
+  function showBubble(text, duration) {
+    duration = duration || 2500;
+    bubble.textContent = text;
+    bubble.classList.add('show');
+    clearTimeout(bubbleTimer);
+    bubbleTimer = setTimeout(function(){
+      bubble.classList.remove('show');
+    }, duration);
   }
 
   function flashPoke() {
@@ -125,54 +208,74 @@ html, body {
     clearTimeout(revertTimer);
     if (currentState === 'sleeping' || currentState === 'collapse') {
       setSvg('wake');
+      showBubble('嗯……醒了醒了');
       revertToIdle(2000);
     }
   }
 
   window.petEngine = {
     onTap: function() {
+      if (locked) return;
       if (currentState === 'sleeping' || currentState === 'collapse') {
         wakeUp();
         return;
       }
       flashPoke();
-      setSvg(pick(TAP_REACTIONS));
+      var reaction = pick(TAP_REACTIONS);
+      setSvg(reaction);
+      var pool = WORDS[reaction];
+      if (pool) showBubble(pick(pool));
       revertToIdle(3000);
     },
 
     onDoubleTap: function() {
+      if (locked) return;
       if (currentState === 'sleeping' || currentState === 'collapse') {
         wakeUp();
         return;
       }
       flashPoke();
       setSvg('heart');
+      showBubble(pick(DOUBLE_TAP_WORDS));
       revertToIdle(3000);
     },
 
     onLongPress: function() {
+      if (locked) return;
       if (currentState === 'sleeping' || currentState === 'collapse') {
         wakeUp();
         return;
       }
       setSvg('shy');
+      showBubble(pick(LONG_PRESS_WORDS));
       revertToIdle(4000);
     },
 
     onComboTap: function(level) {
+      if (locked) return;
       if (currentState === 'sleeping' || currentState === 'collapse') {
         wakeUp();
         return;
       }
       flashPoke();
       level = Math.min(level, 3);
-      var idx = level - 1;
-      setSvg(COMBO_REACTIONS[idx] || 'dizzy');
-      var delay = level >= 3 ? 5000 : 3500;
-      revertToIdle(delay);
+      if (level === 1) {
+        setSvg('dizzy');
+        showBubble(pick(WORDS.dizzy));
+        revertToIdle(6000);
+      } else if (level === 2) {
+        setSvg('error');
+        showBubble(pick(WORDS.error));
+        revertToIdle(4000);
+      } else {
+        setSvg('outlaw');
+        showBubble(pick(WORDS.outlaw));
+        revertToIdle(16000);
+      }
     },
 
     say: function(text, emotion) {
+      if (locked) return;
       if (currentState === 'sleeping' || currentState === 'collapse') {
         wakeUp();
       }
@@ -182,6 +285,7 @@ html, body {
       } else {
         setSvg('thinking');
       }
+      showBubble(text, 4000);
       revertToIdle(5000);
     },
 
