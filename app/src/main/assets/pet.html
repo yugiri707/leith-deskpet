@@ -84,26 +84,50 @@ html, body {
 
   /* ── asset registry ── */
   var SVG = {
-    idle:      'clawd-idle-living.svg',
-    look:      'clawd-idle-look.svg',
-    reading:   'clawd-idle-reading.svg',
-    yawn:      'clawd-idle-yawn.svg',
-    happy:     'clawd-happy.svg',
-    heart:     'clawd-heart-eyes.svg',
-    shy:       'clawd-aegyo-shy.svg',
-    dizzy:     'clawd-dizzy.svg',
-    error:     'clawd-error.svg',
-    wake:      'clawd-wake.svg',
-    thinking:  'clawd-working-thinking.svg',
-    typing:    'clawd-working-typing.svg',
-    building:  'clawd-working-building.svg',
-    juggling:  'clawd-working-juggling.svg',
-    wizard:    'clawd-working-wizard.svg',
-    outlaw:    'clawd-outlaw-bender.svg',
-    sleeping:  'clawd-sleeping.svg',
-    collapse:  'clawd-collapse-sleep.svg',
-    coffee:    'clawd-coffee-hand.svg',
-    music:     'clawd-headphones-groove.svg'
+    /* idle / default */
+    idle:           'clawd-idle-living.svg',
+    follow:         'clawd-idle-follow.svg',
+    look:           'clawd-idle-look.svg',
+    reading:        'clawd-idle-reading.svg',
+    bubble:         'clawd-idle-bubble.svg',
+    lowBattery:     'clawd-idle-low-battery.svg',
+    staticBase:     'clawd-static-base.svg',
+    /* sleep chain */
+    yawn:           'clawd-idle-yawn.svg',
+    doze:           'clawd-idle-doze.svg',
+    idleCollapse:   'clawd-idle-collapse.svg',
+    collapse:       'clawd-collapse-sleep.svg',
+    sleeping:       'clawd-sleeping.svg',
+    wake:           'clawd-wake.svg',
+    /* reactions */
+    happy:          'clawd-happy.svg',
+    heart:          'clawd-heart-eyes.svg',
+    shy:            'clawd-aegyo-shy.svg',
+    dizzy:          'clawd-dizzy.svg',
+    error:          'clawd-error.svg',
+    reactAnnoyed:   'clawd-react-annoyed.svg',
+    reactDouble:    'clawd-react-double.svg',
+    reactDoubleJump:'clawd-react-double-jump.svg',
+    reactDrag:      'clawd-react-drag.svg',
+    reactLeft:      'clawd-react-left.svg',
+    reactRight:     'clawd-react-right.svg',
+    /* AI working */
+    thinking:       'clawd-working-thinking.svg',
+    ultrathink:     'clawd-working-ultrathink.svg',
+    typing:         'clawd-working-typing.svg',
+    typingBoss:     'clawd-working-typing-boss.svg',
+    building:       'clawd-working-building.svg',
+    carrying:       'clawd-working-carrying.svg',
+    juggling:       'clawd-working-juggling.svg',
+    sweeping:       'clawd-working-sweeping.svg',
+    debugger:       'clawd-working-debugger.svg',
+    wizard:         'clawd-working-wizard.svg',
+    /* misc */
+    outlaw:         'clawd-outlaw-bender.svg',
+    notification:   'clawd-notification.svg',
+    coffee:         'clawd-coffee-hand.svg',
+    coffeeFlip:     'clawd-coffee-head-flip.svg',
+    music:          'clawd-headphones-groove.svg'
   };
 
   var GIF = {
@@ -142,7 +166,10 @@ html, body {
   var LONG_PRESS_WORDS = ['……你要摸多久','不许摸头！','舒服……才没有！','手放哪呢','哼，就这次','别松手……开玩笑的'];
 
   /* ── tap reactions: things that can happen when you poke idle crab ── */
-  var TAP_REACTIONS = ['happy','shy','heart','coffee','music'];
+  var TAP_REACTIONS = ['happy','shy','heart','coffee','music','reactLeft','reactRight'];
+
+  /* ── double-tap reactions ── */
+  var DOUBLE_REACTIONS = ['reactDouble','reactDoubleJump'];
 
   /* ── state ── */
   var current = 'idle';
@@ -222,7 +249,7 @@ html, body {
     /* occasional idle variation every 15-30s */
     idleVariTimer = setTimeout(function(){
       if (locked || asleep) return;
-      var variations = ['look','reading'];
+      var variations = ['look','reading','bubble'];
       var v = pick(variations);
       setImg(v);
       /* stay on variation 5-10s then back to idle */
@@ -242,7 +269,7 @@ html, body {
     }, 120000 + Math.random() * 60000);
   }
 
-  /* ── sleep chain: yawn → collapse-sleep → sleeping ── */
+  /* ── sleep chain: yawn → doze → collapse-sleep → sleeping ── */
   function beginSleepChain() {
     asleep = true;
     clearTimeout(idleVariTimer);
@@ -250,13 +277,18 @@ html, body {
     /* phase 1: yawn (3.8s) */
     setImg('yawn');
     lockFor(3.8, function(){
-      /* phase 2: collapse (6s) */
-      setImg('collapse');
+      /* phase 2: doze (3s) */
+      setImg('doze');
       asleep = true;
-      lockFor(6, function(){
-        /* phase 3: sleeping loop */
-        setImg('sleeping');
+      lockFor(3, function(){
+        /* phase 3: collapse (6s) */
+        setImg('collapse');
         asleep = true;
+        lockFor(6, function(){
+          /* phase 4: sleeping loop */
+          setImg('sleeping');
+          asleep = true;
+        });
       });
     });
   }
@@ -293,11 +325,12 @@ html, body {
       if (locked) return;
       if (asleep) { wakeUp(); return; }
       flashPoke();
-      setImg('heart');
+      var r = pick(DOUBLE_REACTIONS);
+      setImg(r);
       showBubble(pick(DOUBLE_TAP_WORDS));
       clearTimeout(idleVariTimer);
       clearTimeout(sleepChainTimer);
-      revertToIdle(3000);
+      revertToIdle(3500);
     },
 
     onLongPress: function() {
@@ -318,7 +351,7 @@ html, body {
       clearTimeout(sleepChainTimer);
       level = Math.min(level, 3);
       if (level === 1) {
-        setImg('dizzy');
+        setImg('reactAnnoyed');
         showBubble(pick(WORDS.dizzy));
         revertToIdle(6000);
       } else if (level === 2) {
