@@ -149,10 +149,13 @@ html, body {
     currentState = stateKey;
     petImg.src = st.file + '.svg';
 
-    /* lock if oneshot */
+    /* lock if oneshot — also kill any pending revert */
     clearTimeout(lockTimer);
     if (st.oneshot && st.minTime > 0) {
       locked = true;
+      clearTimeout(revertTimer);
+      clearTimeout(idleTimer);
+      clearTimeout(sleepTimer);
       lockTimer = setTimeout(function(){
         locked = false;
       }, st.minTime * 1000);
