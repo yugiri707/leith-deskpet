@@ -76,37 +76,53 @@ html, body {
 
 <div id="bubble"></div>
 <div id="pet-container">
-  <img id="pet-svg" src="clawd-idle-living.svg" alt="Clawd">
+  <img id="pet-img" src="clawd-idle-living.svg" alt="Clawd">
 </div>
 
 <script>
 (function(){
 
-  /* ── state config ──
-     minTime: minimum seconds before this animation can be interrupted
-     oneshot: if true, lock input until minTime expires
-  */
-  var STATES = {
-    idle:     { file:'clawd-idle-living',        minTime:0,  oneshot:false },
-    look:     { file:'clawd-idle-look',           minTime:0,  oneshot:false },
-    yawn:     { file:'clawd-idle-yawn',           minTime:3.8, oneshot:true },
-    reading:  { file:'clawd-idle-reading',        minTime:0,  oneshot:false },
-    happy:    { file:'clawd-happy',               minTime:0,  oneshot:false },
-    heart:    { file:'clawd-heart-eyes',          minTime:0,  oneshot:false },
-    shy:      { file:'clawd-aegyo-shy',           minTime:0,  oneshot:false },
-    dizzy:    { file:'clawd-dizzy',               minTime:0,  oneshot:false },
-    error:    { file:'clawd-error',               minTime:0,  oneshot:false },
-    wake:     { file:'clawd-wake',                minTime:1.5, oneshot:true },
-    thinking: { file:'clawd-working-thinking',    minTime:0,  oneshot:false },
-    typing:   { file:'clawd-working-typing',      minTime:0,  oneshot:false },
-    building: { file:'clawd-working-building',    minTime:0,  oneshot:false },
-    juggling: { file:'clawd-working-juggling',    minTime:0,  oneshot:false },
-    wizard:   { file:'clawd-working-wizard',      minTime:0,  oneshot:false },
-    outlaw:   { file:'clawd-outlaw-bender',       minTime:15, oneshot:true },
-    sleeping: { file:'clawd-sleeping',            minTime:0,  oneshot:false },
-    collapse: { file:'clawd-collapse-sleep',      minTime:6,  oneshot:true },
-    coffee:   { file:'clawd-coffee-hand',         minTime:0,  oneshot:false },
-    music:    { file:'clawd-headphones-groove',   minTime:0,  oneshot:false }
+  /* ── asset registry ── */
+  var SVG = {
+    idle:      'clawd-idle-living.svg',
+    look:      'clawd-idle-look.svg',
+    reading:   'clawd-idle-reading.svg',
+    yawn:      'clawd-idle-yawn.svg',
+    happy:     'clawd-happy.svg',
+    heart:     'clawd-heart-eyes.svg',
+    shy:       'clawd-aegyo-shy.svg',
+    dizzy:     'clawd-dizzy.svg',
+    error:     'clawd-error.svg',
+    wake:      'clawd-wake.svg',
+    thinking:  'clawd-working-thinking.svg',
+    typing:    'clawd-working-typing.svg',
+    building:  'clawd-working-building.svg',
+    juggling:  'clawd-working-juggling.svg',
+    wizard:    'clawd-working-wizard.svg',
+    outlaw:    'clawd-outlaw-bender.svg',
+    sleeping:  'clawd-sleeping.svg',
+    collapse:  'clawd-collapse-sleep.svg',
+    coffee:    'clawd-coffee-hand.svg',
+    music:     'clawd-headphones-groove.svg'
+  };
+
+  var GIF = {
+    ball:      'gif_ball.gif',
+    happy:     'gif_happy.gif',
+    idle:      'gif_idle.gif',
+    music:     'gif_music.gif',
+    sleep:     'gif_sleep.gif',
+    thinking:  'gif_thinking.gif',
+    thinking2: 'gif_thinking2.gif',
+    typing:    'gif_typing.gif'
+  };
+
+  /* ── oneshot durations (seconds) ── */
+  var ONESHOT = {
+    yawn: 3.8,
+    wake: 1.5,
+    collapse: 6,
+    outlaw: 15
   };
 
   /* ── expression-matched word pools ── */
@@ -117,25 +133,28 @@ html, body {
     wake:   ['干嘛戳我！','吓我一跳','嗯？','……困','谁啊'],
     dizzy:  ['够了够了！','晕了……','头好晕','别戳了别戳了！','消停会儿行不！'],
     error:  ['要坏掉了！','救命','系统过载中','ERROR!!','哔——'],
-    outlaw: ['哼，干杯','今晚不醉不归','……再来一瓶','别管我','世界真美好啊……嗝']
+    outlaw: ['哼，干杯','今晚不醉不归','……再来一瓶','别管我','世界真美好啊……嗝'],
+    coffee: ['喝口水~','休息一下','☕','来一杯？'],
+    music:  ['♪♪♪','在听歌~','别打扰，有vibe','哼哼~']
   };
 
   var DOUBLE_TAP_WORDS = ['❤️','喜欢你~','嘿嘿嘿','心跳加速中','你怎么这么可爱','被你戳到心了'];
-
   var LONG_PRESS_WORDS = ['……你要摸多久','不许摸头！','舒服……才没有！','手放哪呢','哼，就这次','别松手……开玩笑的'];
 
-  var IDLE_STATES = ['idle','look','yawn','reading','coffee','music'];
-  var TAP_REACTIONS = ['happy','shy','wake','heart'];
+  /* ── tap reactions: things that can happen when you poke idle crab ── */
+  var TAP_REACTIONS = ['happy','shy','heart','coffee','music'];
 
-  var currentState = 'idle';
+  /* ── state ── */
+  var current = 'idle';
   var locked = false;
   var lockTimer = null;
-  var idleTimer = null;
-  var sleepTimer = null;
-  var bubbleTimer = null;
+  var idleVariTimer = null;   /* occasional idle variation */
+  var sleepChainTimer = null; /* yawn → collapse → sleeping */
   var revertTimer = null;
+  var bubbleTimer = null;
+  var asleep = false;         /* true when in yawn/collapse/sleeping */
 
-  var petImg = document.getElementById('pet-svg');
+  var petImg = document.getElementById('pet-img');
   var bubble = document.getElementById('bubble');
   var container = document.getElementById('pet-container');
 
@@ -143,27 +162,28 @@ html, body {
     return arr[Math.floor(Math.random() * arr.length)];
   }
 
-  function setSvg(stateKey) {
-    var st = STATES[stateKey];
-    if (!st) return;
-    currentState = stateKey;
-    petImg.src = st.file + '.svg';
-
-    /* lock if oneshot — also kill any pending revert */
-    clearTimeout(lockTimer);
-    if (st.oneshot && st.minTime > 0) {
-      locked = true;
-      clearTimeout(revertTimer);
-      clearTimeout(idleTimer);
-      clearTimeout(sleepTimer);
-      lockTimer = setTimeout(function(){
-        locked = false;
-      }, st.minTime * 1000);
-    } else {
-      locked = false;
-    }
+  /* ── set image (svg or gif) ── */
+  function setImg(key, isGif) {
+    var src = isGif ? GIF[key] : SVG[key];
+    if (!src) return;
+    current = key;
+    petImg.src = src;
   }
 
+  /* ── lock for oneshot animations ── */
+  function lockFor(seconds, afterFn) {
+    locked = true;
+    clearTimeout(lockTimer);
+    clearTimeout(revertTimer);
+    clearTimeout(idleVariTimer);
+    clearTimeout(sleepChainTimer);
+    lockTimer = setTimeout(function(){
+      locked = false;
+      if (afterFn) afterFn();
+    }, seconds * 1000);
+  }
+
+  /* ── bubble ── */
   function showBubble(text, duration) {
     duration = duration || 2500;
     bubble.textContent = text;
@@ -181,126 +201,169 @@ html, body {
     }, 200);
   }
 
-  function revertToIdle(delay) {
-    clearTimeout(revertTimer);
-    revertTimer = setTimeout(function(){
-      setSvg('idle');
-      resetIdleTimer();
-    }, delay || 3000);
+  /* ── go back to idle and restart timers ── */
+  function goIdle() {
+    asleep = false;
+    setImg('idle');
+    startIdleLoop();
   }
 
-  function resetIdleTimer() {
-    clearTimeout(idleTimer);
-    clearTimeout(sleepTimer);
+  /* ── revert to idle after a delay ── */
+  function revertToIdle(delay) {
+    clearTimeout(revertTimer);
+    revertTimer = setTimeout(goIdle, delay || 3000);
+  }
 
-    idleTimer = setTimeout(function(){
-      var s = pick(IDLE_STATES);
-      setSvg(s);
-      resetIdleTimer();
-    }, 12000 + Math.random() * 13000);
+  /* ── idle loop: mostly idle-living, occasionally look/reading ── */
+  function startIdleLoop() {
+    clearTimeout(idleVariTimer);
+    clearTimeout(sleepChainTimer);
 
-    sleepTimer = setTimeout(function(){
-      clearTimeout(idleTimer);
-      setSvg('sleeping');
+    /* occasional idle variation every 15-30s */
+    idleVariTimer = setTimeout(function(){
+      if (locked || asleep) return;
+      var variations = ['look','reading'];
+      var v = pick(variations);
+      setImg(v);
+      /* stay on variation 5-10s then back to idle */
+      revertTimer = setTimeout(function(){
+        if (!locked && !asleep) {
+          setImg('idle');
+          current = 'idle';
+        }
+        startIdleLoop();
+      }, 5000 + Math.random() * 5000);
+    }, 15000 + Math.random() * 15000);
+
+    /* sleep chain: after 2-3 min of no interaction → yawn → collapse → sleeping */
+    sleepChainTimer = setTimeout(function(){
+      if (locked) return;
+      beginSleepChain();
     }, 120000 + Math.random() * 60000);
   }
 
-  function wakeUp() {
-    clearTimeout(idleTimer);
-    clearTimeout(sleepTimer);
-    clearTimeout(revertTimer);
-    if (currentState === 'sleeping' || currentState === 'collapse') {
-      setSvg('wake');
-      showBubble('嗯……醒了醒了');
-      revertToIdle(2000);
-    }
+  /* ── sleep chain: yawn → collapse-sleep → sleeping ── */
+  function beginSleepChain() {
+    asleep = true;
+    clearTimeout(idleVariTimer);
+
+    /* phase 1: yawn (3.8s) */
+    setImg('yawn');
+    lockFor(3.8, function(){
+      /* phase 2: collapse (6s) */
+      setImg('collapse');
+      asleep = true;
+      lockFor(6, function(){
+        /* phase 3: sleeping loop */
+        setImg('sleeping');
+        asleep = true;
+      });
+    });
   }
 
+  /* ── wake up from sleep ── */
+  function wakeUp() {
+    clearTimeout(lockTimer);
+    locked = false;
+    asleep = false;
+    setImg('wake');
+    showBubble(pick(WORDS.wake));
+    lockFor(1.5, function(){
+      goIdle();
+    });
+  }
+
+  /* ── public API for Kotlin/broadcast ── */
   window.petEngine = {
+
     onTap: function() {
       if (locked) return;
-      if (currentState === 'sleeping' || currentState === 'collapse') {
-        wakeUp();
-        return;
-      }
+      if (asleep) { wakeUp(); return; }
       flashPoke();
       var reaction = pick(TAP_REACTIONS);
-      setSvg(reaction);
+      setImg(reaction);
       var pool = WORDS[reaction];
       if (pool) showBubble(pick(pool));
+      clearTimeout(idleVariTimer);
+      clearTimeout(sleepChainTimer);
       revertToIdle(3000);
     },
 
     onDoubleTap: function() {
       if (locked) return;
-      if (currentState === 'sleeping' || currentState === 'collapse') {
-        wakeUp();
-        return;
-      }
+      if (asleep) { wakeUp(); return; }
       flashPoke();
-      setSvg('heart');
+      setImg('heart');
       showBubble(pick(DOUBLE_TAP_WORDS));
+      clearTimeout(idleVariTimer);
+      clearTimeout(sleepChainTimer);
       revertToIdle(3000);
     },
 
     onLongPress: function() {
       if (locked) return;
-      if (currentState === 'sleeping' || currentState === 'collapse') {
-        wakeUp();
-        return;
-      }
-      setSvg('shy');
+      if (asleep) { wakeUp(); return; }
+      setImg('shy');
       showBubble(pick(LONG_PRESS_WORDS));
+      clearTimeout(idleVariTimer);
+      clearTimeout(sleepChainTimer);
       revertToIdle(4000);
     },
 
     onComboTap: function(level) {
       if (locked) return;
-      if (currentState === 'sleeping' || currentState === 'collapse') {
-        wakeUp();
-        return;
-      }
+      if (asleep) { wakeUp(); return; }
       flashPoke();
+      clearTimeout(idleVariTimer);
+      clearTimeout(sleepChainTimer);
       level = Math.min(level, 3);
       if (level === 1) {
-        setSvg('dizzy');
+        setImg('dizzy');
         showBubble(pick(WORDS.dizzy));
         revertToIdle(6000);
       } else if (level === 2) {
-        setSvg('error');
+        setImg('error');
         showBubble(pick(WORDS.error));
         revertToIdle(4000);
       } else {
-        setSvg('outlaw');
-        showBubble(pick(WORDS.outlaw));
-        revertToIdle(16000);
+        setImg('outlaw');
+        showBubble(pick(WORDS.outlaw), 15000);
+        lockFor(15, function(){
+          goIdle();
+        });
       }
     },
 
+    /* for future broadcast integration */
     say: function(text, emotion) {
       if (locked) return;
-      if (currentState === 'sleeping' || currentState === 'collapse') {
-        wakeUp();
-      }
+      if (asleep) wakeUp();
       clearTimeout(revertTimer);
-      if (emotion && STATES[emotion]) {
-        setSvg(emotion);
+      clearTimeout(idleVariTimer);
+      clearTimeout(sleepChainTimer);
+      if (emotion && SVG[emotion]) {
+        setImg(emotion);
       } else {
-        setSvg('thinking');
+        setImg('thinking');
       }
       showBubble(text, 4000);
       revertToIdle(5000);
     },
 
     setState: function(stateKey) {
-      if (STATES[stateKey]) {
-        setSvg(stateKey);
-        resetIdleTimer();
+      if (SVG[stateKey] || GIF[stateKey]) {
+        var isGif = !SVG[stateKey];
+        clearTimeout(idleVariTimer);
+        clearTimeout(sleepChainTimer);
+        clearTimeout(revertTimer);
+        setImg(stateKey, isGif);
       }
     }
   };
 
-  resetIdleTimer();
+  /* ── start ── */
+  startIdleLoop();
+
 })();
 </script>
 </body>
